@@ -613,8 +613,16 @@ export function createRenderer(canvas) {
       size: 104, font: SERIF, align: 'center', colour: '#f2f7ff', weight: '600',
     });
     text('SCORE', FIELD.width / 2, 332, { size: 13, align: 'center', colour: PALETTE.dim, spacing: 6 });
-    text(`WAVE ${state.wave} \u00b7 ${state.kills} RETURNED \u00b7 ${state.upgrades.length} GIFTS`, FIELD.width / 2, 384, {
-      size: 14, align: 'center', colour: PALETTE.ward, spacing: 2,
+    // The run's own arithmetic, because a score on its own says nothing about how the run went.
+    const survived = `${Math.floor(state.time / 60)}:${String(Math.floor(state.time % 60)).padStart(2, '0')}`;
+    text(`WAVE ${state.wave}${state.zoneName ? ` \u00b7 ${state.zoneName}` : ''}`, FIELD.width / 2, 376, {
+      size: 14, align: 'center', colour: PALETTE.ward, spacing: 3,
+    });
+    text(`${survived} SURVIVED \u00b7 ${state.kills} RETURNED \u00b7 BEST CHAIN \u00d7${Math.max(1, state.bestChain)}`, FIELD.width / 2, 402, {
+      size: 13, align: 'center', colour: PALETTE.dim, spacing: 2,
+    });
+    text(`${state.upgrades.length} GIFTS \u00b7 ${(state.relics || []).length} ${(state.relics || []).length === 1 ? 'RELIC' : 'RELICS'}`, FIELD.width / 2, 426, {
+      size: 13, align: 'center', colour: (state.relics || []).length ? PALETTE.gold : PALETTE.dim, spacing: 2,
     });
     text(bested ? `NEW BEST \u2014 ${state.score}` : `BEST ${best}`, FIELD.width / 2, 434, {
       size: 16, align: 'center', colour: bested ? PALETTE.gold : PALETTE.dim, spacing: 3, weight: '600',

@@ -200,12 +200,12 @@ export function stageShot(name, world) {
     return { screen: 'play', hover: 0 };
   }
 
-  if (name === 'boss') {
-    world.reset();
-    // A boss sits at wave five, past where a four-heart run usually ends, so this scene hands the warden
-    // the loadout a player would plausibly hold by then: two Step cards, two Wider Ward cards, a Hot
-    // Mirror, a Steady Hand, a Lasting Light and the extra hearts two Steady Wicks buy. Every card is one
-    // the game really offers, and every frame after this is the real rules run by the real autopilot.
+  /**
+   * A warden handed the loadout a player plausibly holds by wave five: two Step cards, two Wider Ward
+   * cards, a Hot Mirror, a Steady Hand, a Lasting Light and the hearts two Steady Wicks buy. Every one is
+   * a card the game really offers, and every frame after this is the real rules and the real autopilot.
+   */
+  const handoff = () => {
     state.mods.maxHearts = 9;
     state.hearts = 9;
     state.mods.speed *= 1.12 * 1.12;
@@ -213,6 +213,15 @@ export function stageShot(name, world) {
     state.mods.reflectDamage *= 1.35;
     state.mods.turnMul *= 1.35;
     state.mods.shardLife *= 1.25;
+  };
+
+  if (name === 'boss') {
+    world.reset();
+    // A boss sits at wave five, past where a four-heart run usually ends, so this scene hands the warden
+    // the loadout a player would plausibly hold by then: two Step cards, two Wider Ward cards, a Hot
+    // Mirror, a Steady Hand, a Lasting Light and the extra hearts two Steady Wicks buy. Every card is one
+    // the game really offers, and every frame after this is the real rules run by the real autopilot.
+    handoff();
 
     let frame = null;
     let frameScore = -1;
@@ -252,11 +261,21 @@ export function stageShot(name, world) {
 
   if (name === 'over') {
     world.reset();
-    runUntil(() => state.wave >= 5, 20000);
-    state.hearts = 0;
-    state.score = Math.max(state.score, 1240);
-    state.chain = 0;
-    world.endRun();
+    handoff();
+    // Play the run out for real and let it end where it ends: the summary then reports a run that happened,
+    // bosses and relics included, rather than a wave-five death posed for the camera.
+    let ended = false;
+    for (let step = 0; step < 60000; step += 1) {
+      if (state.phase === 'upgrade') { world.chooseUpgrade(0); continue; }
+      if (state.phase === 'over') { ended = true; break; }
+      world.step(STEP, autopilot(state));
+    }
+    if (!ended) {
+      // Still standing after the loop: finish the run deliberately so the screen is the real summary.
+      state.hearts = 0;
+      state.chain = 0;
+      world.endRun();
+    }
     return { screen: 'over', hover: 0 };
   }
 

@@ -72,6 +72,12 @@ export function createWorld(random) {
     kills: 0,
     chain: 0,
     chainTimer: 0,
+    bestChain: 0,
+    relics: [],
+    zone: null,
+    zoneName: '',
+    offerKind: 'upgrade',
+    pendingRelic: false,
     charge: 0,
     mods: freshMods(),
     upgrades: [],
@@ -100,6 +106,8 @@ export function createWorld(random) {
     state.kills = 0;
     state.chain = 0;
     state.chainTimer = 0;
+    state.bestChain = 0;
+    state.relics = [];
     state.charge = 0;
     state.mods = freshMods();
     state.upgrades = [];
@@ -211,6 +219,7 @@ export function createWorld(random) {
     state.kills += 1;
     state.chainTimer = SCORE.chainWindow;
     state.chain = Math.min(SCORE.chainMax + 1, state.chain + 1);
+    if (state.chain > state.bestChain) state.bestChain = state.chain;
     const multiplier = 1 + (state.chain - 1) * SCORE.chainStep;
     state.score += Math.round(SCORE.perKill * multiplier);
     const colour = enemy.kind === 'lurker' ? '#ff5d8f' : enemy.kind === 'splitter' ? '#a678ff'
@@ -598,6 +607,8 @@ export function createWorld(random) {
     const upgrade = state.offer[index];
     if (!upgrade) return false;
     applyUpgrade(state, upgrade);
+    // Relics are the boss cards: the summary counts them apart from ordinary gifts.
+    if (String(upgrade.id).startsWith('relic-')) state.relics.push(upgrade.id);
     state.offer = [];
     startWave();
     return true;
