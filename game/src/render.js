@@ -1,7 +1,7 @@
 // All drawing. The renderer owns the canvas, the letterbox transform and the palette; it reads the
 // simulation's state and paints it, and it never changes the state. Screens are painted over the same
 // field, so the title, the upgrade choice and the summary all sit in the world rather than beside it.
-import { FIELD, FLARE, PALETTE, WARD, WARDEN } from './config.js';
+import { ENEMY, FIELD, FLARE, PALETTE, WARD, WARDEN } from './config.js';
 import { CARD_LAYOUT } from './input.js';
 import { PHASE_OVER, PHASE_TITLE, PHASE_UPGRADE, PHASE_WAVE } from './world.js';
 
@@ -148,12 +148,13 @@ export function createRenderer(canvas) {
     ctx.globalAlpha = 1;
   }
 
-  function drawEnemy(enemy) {
+  function drawEnemy(enemy, state) {
     const flash = enemy.hurt > 0;
     const colour = flash ? PALETTE.foeHurt
       : enemy.kind === 'lurker' ? PALETTE.lurker
         : enemy.kind === 'splitter' ? PALETTE.splitter
-          : enemy.kind === 'sentinel' ? PALETTE.sentinel : PALETTE.foe;
+          : enemy.kind === 'sentinel' ? PALETTE.sentinel
+            : enemy.boss ? (enemy.bossPhase === 3 ? PALETTE.danger : PALETTE.gold) : PALETTE.foe;
     const r = enemy.radius;
     ctx.save();
     ctx.translate(enemy.x, enemy.y);
@@ -199,6 +200,29 @@ export function createRenderer(canvas) {
       ctx.lineTo(-r * 0.6, -r * 0.9);
       ctx.closePath();
       ctx.fill();
+      ctx.stroke();
+    } else if (enemy.boss) {
+      // A boss is a ring inside a ring, with the phase it is in written in its teeth.
+      ctx.rotate(enemy.phase + state.time * 0.2);
+      const teeth = enemy.bossPhase === 1 ? 8 : enemy.bossPhase === 2 ? 10 : 12;
+      ctx.beginPath();
+      for (let index = 0; index < teeth * 2; index += 1) {
+        const a = (index / (teeth * 2)) * TAU;
+        const radius = index % 2 === 0 ? r : r * 0.72;
+        const x = Math.cos(a) * radius;
+        const y = Math.sin(a) * radius;
+        if (index === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+      }
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.lineWidth = 1.5;
+      ctx.strokeStyle = enemy.bossPhase === 3 ? 'rgba(255,107,122,0.85)' : 'rgba(255,209,102,0.7)';
+      ctx.arc(0, 0, r * 0.5, 0, TAU);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.arc(0, 0, r + 12 + Math.sin(state.time * 4) * 3, 0, TAU);
       ctx.stroke();
     } else {
       ctx.beginPath();
@@ -382,6 +406,10 @@ export function createRenderer(canvas) {
     }
     text(`WAVE ${state.wave}`, 32, 86, { size: 15, spacing: 3, colour: PALETTE.ward, weight: '600' });
     text(state.waveName, 32, 108, { size: 13, colour: PALETTE.dim, spacing: 1 });
+    if (state.zone) {
+      // The zone the run is standing in, in its own colour, so a tilt in the rules is never silent.
+      text(state.zoneName, 32, 130, { size: 11, colour: state.zone.accent, spacing: 3, alpha: 0.85 });
+    }
 
     // Score, top right, with the chain multiplier under it.
     text(String(state.score).padStart(4, '0'), FIELD.width - 32, 52, { size: 34, align: 'right', colour: PALETTE.text, weight: '600' });
@@ -390,6 +418,32 @@ export function createRenderer(canvas) {
       const pulse = 1 + Math.sin(state.time * 12) * 0.04;
       text(`\u00d7${state.chain}`, FIELD.width - 32, 116, {
         size: Math.round(22 * pulse), align: 'right', colour: PALETTE.gold, weight: '700', spacing: 1,
+      });
+    }
+
+    // A boss on the field owns the top centre: its name, its phase, and how much of it is left.
+    const boss = state.enemies.find((enemy) => enemy.boss);
+    if (boss) {
+      const barWidth = 420;
+      const barX = FIELD.width / 2 - barWidth / 2;
+      const barY = 34;
+      ctx.save();
+      ctx.fillStyle = 'rgba(10,14,26,0.78)';
+      ctx.fillRect(barX - 3, barY - 3, barWidth + 6, 12);
+      const frac = Math.max(0, Math.min(1, boss.hp / boss.maxHp));
+      const grad = ctx.createLinearGradient(barX, 0, barX + barWidth, 0);
+      grad.addColorStop(0, boss.bossPhase === 3 ? '#ff6b7a' : '#ffd166');
+      grad.addColorStop(1, boss.bossPhase === 3 ? '#ffb3c1' : '#fff3c4');
+      ctx.fillStyle = grad;
+      glow(boss.bossPhase === 3 ? PALETTE.danger : PALETTE.gold, 18);
+      ctx.fillRect(barX, barY, barWidth * frac, 6);
+      ctx.restore();
+      text(bossName(boss.kind), FIELD.width / 2, barY - 12, {
+        size: 14, align: 'center', spacing: 4, weight: '700',
+        colour: boss.bossPhase === 3 ? PALETTE.danger : PALETTE.gold,
+      });
+      text(`PHASE ${boss.bossPhase} / 3`, FIELD.width / 2, barY + 24, {
+        size: 10, align: 'center', spacing: 3, colour: PALETTE.dim,
       });
     }
 
@@ -420,6 +474,11 @@ export function createRenderer(canvas) {
         size: 12, colour: PALETTE.dim, spacing: 2,
       });
     }
+  }
+
+  /** The boss's real name lives in the config table; the renderer only borrows it. */
+  function bossName(kind) {
+    return (ENEMY[kind] && ENEMY[kind].name) || 'SOMETHING OLD';
   }
 
   function drawTitle(state, best) {
@@ -485,18 +544,22 @@ export function createRenderer(canvas) {
   function drawUpgrade(state, hover = 0) {
     ctx.fillStyle = 'rgba(6,9,18,0.82)';
     ctx.fillRect(0, 0, FIELD.width, FIELD.height);
+    const relic = state.offerKind === 'relic';
     text(`WAVE ${state.wave} CLEARED`, FIELD.width / 2, 200, {
-      size: 15, align: 'center', colour: PALETTE.ward, spacing: 6, weight: '600',
+      size: 15, align: 'center', colour: relic ? PALETTE.gold : PALETTE.ward, spacing: 6, weight: '600',
     });
-    text('Choose a gift', FIELD.width / 2, 258, {
-      size: 46, font: SERIF, align: 'center', spacing: 3, colour: '#f2f7ff',
+    text(relic ? 'It left something behind' : 'Choose a gift', FIELD.width / 2, 258, {
+      size: relic ? 40 : 46, font: SERIF, align: 'center', spacing: 3,
+      colour: relic ? '#ffe9b0' : '#f2f7ff',
     });
-    text('1 / 2 / 3, or click', FIELD.width / 2, 292, {
+    text(relic ? '1 / 2, or click \u2014 one relic, no going back' : '1 / 2 / 3, or click', FIELD.width / 2, 292, {
       size: 13, align: 'center', colour: PALETTE.dim, spacing: 3,
     });
 
     state.offer.forEach((upgrade, index) => {
-      const card = CARD_LAYOUT[index];
+      // Two cards are drawn on the outer slots so the pair reads as a choice rather than a gap.
+      const slot = state.offer.length === 2 ? index * 2 : index;
+      const card = CARD_LAYOUT[slot];
       if (!card) return;
       const active = hover === index + 1;
       ctx.save();
@@ -588,7 +651,7 @@ export function createRenderer(canvas) {
 
     drawBackground(state);
     drawFlare(state);
-    for (const enemy of state.enemies) drawEnemy(enemy);
+    for (const enemy of state.enemies) drawEnemy(enemy, state);
     for (const shard of state.shards) drawShard(shard, state);
     drawParticles(state.particles ?? { all: [], life: () => 1 });
     if (screen !== SCREEN_TITLE) drawWard(state);

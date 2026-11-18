@@ -52,7 +52,21 @@ export const ENEMY = {
   lurker: { radius: 14, hp: 16, speed: 172, fireFor: 0, damage: 1 },
   splitter: { radius: 22, hp: 34, speed: 40, fireFor: 3.4, damage: 1 },
   sentinel: { radius: 24, hp: 52, speed: 34, fireFor: 3.1, damage: 1 },
+  // Bosses live in the same table so the step loop reads one spec shape, but they are neither spawned
+  // by waveComposition nor shuffled into a spawn order: waves.js places them, and stepEnemies gives
+  // them their own movement and their three-phase attack script.
+  hollowking: {
+    radius: 46, hp: 560, speed: 44, fireFor: 2.3, damage: 1, keepAway: 330,
+    boss: true, name: 'THE HOLLOW KING', score: 420,
+  },
+  leviathan: {
+    radius: 54, hp: 880, speed: 38, fireFor: 2.0, damage: 1, keepAway: 360,
+    boss: true, name: 'THE WOUND LEVIATHAN', score: 760,
+  },
 };
+
+/** A boss arrives every this many waves, alternating between the two, and its health climbs each time. */
+export const BOSS = { every: 5, hpPerCycle: 0.42 };
 
 export const SCORE = {
   perKill: 10,

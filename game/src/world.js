@@ -2,10 +2,11 @@
 // resolves what hit what. It owns no drawing and no sound; it returns a bitmask of what happened this
 // step, and main.js turns those bits into audio and screen changes. That split is what lets a screenshot
 // scene play the real rules forward with an autopilot and come out the same every time.
-import { ENEMY, FIELD, FLARE, SCORE, SHARD, STEP, WARD, WARDEN } from './config.js';
+import { BOSS, ENEMY, FIELD, FLARE, SCORE, SHARD, STEP, WARD, WARDEN } from './config.js';
 import { createParticles } from './particles.js';
-import { applyUpgrade, offerUpgrades } from './upgrades.js';
-import { enemySpeedFor, fireRateFor, waveName, waveSpawnOrder } from './waves.js';
+import { applyUpgrade, offerRelics, offerUpgrades } from './upgrades.js';
+import { bossFor, enemySpeedFor, fireRateFor, waveName, waveSpawnOrder } from './waves.js';
+import { isZoneStart, zoneFor } from './zones.js';
 
 export const EV_HIT = 1;
 export const EV_OVER = 2;
@@ -45,6 +46,11 @@ function freshMods() {
     maxHearts: WARDEN.maxHearts,
     invuln: WARDEN.invulnFor,
     knockback: WARDEN.knockback,
+    // The four the newer cards move. They start neutral so an unmodified run reads the config numbers.
+    turnMul: 1,
+    shardLife: SHARD.lifeFor,
+    killCharge: 0,
+    flareDamage: FLARE.damage,
   };
 }
 
@@ -56,6 +62,11 @@ export function createWorld(random) {
     time: 0,
     wave: 0,
     waveName: waveName(1),
+    zone: zoneFor(1),
+    zoneName: zoneFor(1).name,
+    offerKind: 'upgrade',
+    pendingRelic: false,
+    bossRef: null,
     hearts: WARDEN.maxHearts,
     score: 0,
     kills: 0,
@@ -111,8 +122,18 @@ export function createWorld(random) {
     state.wave += 1;
     state.waveName = waveName(state.wave);
     state.phase = PHASE_WAVE;
+    const zone = zoneFor(state.wave);
+    state.zone = zone;
+    state.zoneName = zone.name;
     const order = waveSpawnOrder(state.wave, random);
-    state.spawnQueue = order.map((kind, index) => ({ kind, at: 0.5 + index * 0.62 }));
+    state.spawnQueue = order.map((kind, index) => ({
+      kind, at: (isZoneStart(state.wave) ? 1.1 : 0.5) + index * 0.62,
+    }));
+    // The boss walks in first and alone, ahead of its escort, so the player has to deal with it looking
+    // at them rather than discovering it behind a crowd.
+    const bossKind = bossFor(state.wave);
+    if (bossKind) state.spawnQueue.unshift({ kind: bossKind, at: 1.4 });
+    state.bossRef = bossKind;
     state.spawnTimer = 0;
     state.waveClock = 0;
     particles.ring(FIELD.width / 2, FIELD.height / 2, '#141c36');
@@ -120,6 +141,10 @@ export function createWorld(random) {
 
   function spawnEnemy(kind) {
     const spec = ENEMY[kind];
+    // A boss that comes back later in endless play comes back heavier, never wider.
+    const cycles = spec.boss ? Math.floor((state.wave - 1) / BOSS.every) : 0;
+    const zoneHp = spec.boss ? 1 : state.zone.hp;
+    const hp = spec.hp * zoneHp * (spec.boss ? 1 + cycles * BOSS.hpPerCycle : 1 + (state.wave - 1) * 0.06);
     const point = random.rim();
     // Keep spawns from landing on top of the player: push them to the far rim if they are close.
     const away = Math.hypot(point.x - state.warden.x, point.y - state.warden.y);
@@ -133,12 +158,16 @@ export function createWorld(random) {
       vx: 0,
       vy: 0,
       radius: spec.radius,
-      hp: spec.hp * (1 + (state.wave - 1) * 0.06),
-      maxHp: spec.hp * (1 + (state.wave - 1) * 0.06),
+      hp,
+      maxHp: hp,
       fireTimer: random.range(0.6, spec.fireFor),
       hurt: 0,
       phase: random.range(0, TAU),
       born: state.time,
+      boss: Boolean(spec.boss),
+      bossPhase: 1,
+      ringTimer: 2.4,
+      spiral: random.range(0, TAU),
     });
   }
 
@@ -206,6 +235,19 @@ export function createWorld(random) {
         });
       }
     }
+    if (state.mods.killCharge > 0) {
+      state.charge = Math.min(FLARE.cost, state.charge + state.mods.killCharge);
+    }
+    if (enemy.boss) {
+      // The boss pays in score and in a relic, and it leaves room for the run to breathe.
+      state.score += (ENEMY[enemy.kind].score ?? 300) * (1 + Math.floor((state.wave - 1) / BOSS.every) * 0.3);
+      state.pendingRelic = true;
+      state.shake = Math.max(state.shake, 20);
+      state.flash = Math.max(state.flash, 0.5);
+      particles.ring(enemy.x, enemy.y, '#ffd166');
+      particles.ash(enemy.x, enemy.y, 46, '#ffd166', enemy.radius * 2);
+      return;
+    }
     state.shake = Math.max(state.shake, 4);
   }
 
@@ -229,12 +271,72 @@ export function createWorld(random) {
     shard.owner = 'player';
     shard.damage = state.mods.reflectDamage;
     shard.pierce = state.mods.pierce;
-    shard.life = SHARD.lifeFor;
+    shard.life = state.mods.shardLife;
     state.charge = Math.min(FLARE.cost, state.charge + state.mods.chargeGain);
     state.score += SCORE.perReflect;
     state.wardFlash = 0.18;
     particles.spark(shard.x, shard.y, Math.atan2(shard.vy, shard.vx), 7);
     return EV_REFLECT;
+  }
+
+  /**
+   * A boss holds the middle distance, strafes, and changes its script as it loses health: aimed spreads,
+   * then a ring that makes standing still fatal, then a spiral that never lets the arena go quiet.
+   */
+  function stepBoss(enemy, spec, dt, rate, pace) {
+    const dx = state.warden.x - enemy.x;
+    const dy = state.warden.y - enemy.y;
+    const distance = Math.hypot(dx, dy) || 1;
+    const ux = dx / distance;
+    const uy = dy / distance;
+    const frac = enemy.maxHp > 0 ? enemy.hp / enemy.maxHp : 0;
+    const phase = frac > 0.66 ? 1 : frac > 0.33 ? 2 : 3;
+    if (phase !== enemy.bossPhase) {
+      enemy.bossPhase = phase;
+      enemy.fireTimer = Math.min(enemy.fireTimer, 0.6);
+      state.shake = Math.max(state.shake, 16);
+      state.flash = Math.max(state.flash, 0.3);
+      particles.ring(enemy.x, enemy.y, phase === 3 ? '#ff6b7a' : '#ffd166');
+    }
+
+    const want = spec.keepAway;
+    const push = distance < want ? -1 : distance > want + 80 ? 1 : 0;
+    const strafe = Math.sin(state.time * (0.7 + phase * 0.25) + enemy.phase) * (0.9 + phase * 0.15);
+    const pace2 = spec.speed * pace * (1 + (phase - 1) * 0.18);
+    enemy.vx = (ux * push - uy * strafe) * pace2;
+    enemy.vy = (uy * push + ux * strafe) * pace2;
+    enemy.x = clamp(enemy.x + enemy.vx * dt, -80, FIELD.width + 80);
+    enemy.y = clamp(enemy.y + enemy.vy * dt, -80, FIELD.height + 80);
+
+    const aim = Math.atan2(dy, dx);
+    const speed = random.range(SHARD.enemySpeedMin, SHARD.enemySpeedMax) * pace;
+
+    enemy.fireTimer -= dt * rate * (1 + (phase - 1) * 0.15);
+    if (enemy.fireTimer <= 0) {
+      enemy.fireTimer = spec.fireFor * random.range(0.85, 1.15);
+      const spread = phase === 1 ? [-0.18, 0, 0.18] : [-0.3, -0.1, 0.1, 0.3];
+      for (const offset of spread) fireShard(enemy, aim + offset, speed);
+    }
+
+    if (phase >= 2) {
+      enemy.ringTimer -= dt * rate;
+      if (enemy.ringTimer <= 0) {
+        enemy.ringTimer = phase === 2 ? 5.2 : 4.0;
+        const spokes = phase === 2 ? 10 : 14;
+        for (let spoke = 0; spoke < spokes; spoke += 1) {
+          fireShard(enemy, enemy.spiral + (spoke / spokes) * TAU, speed * 0.72);
+        }
+        particles.ring(enemy.x, enemy.y, '#ff6b7a');
+      }
+    }
+
+    if (phase === 3) {
+      enemy.spiral += dt * 1.9;
+      if (Math.floor(state.time * 5) !== Math.floor((state.time - dt) * 5)) {
+        fireShard(enemy, enemy.spiral, speed * 0.85);
+        fireShard(enemy, enemy.spiral + Math.PI, speed * 0.85);
+      }
+    }
   }
 
   function stepEnemies(dt) {
@@ -252,6 +354,11 @@ export function createWorld(random) {
       const distance = Math.hypot(dx, dy) || 1;
       const ux = dx / distance;
       const uy = dy / distance;
+
+      if (spec.boss) {
+        stepBoss(enemy, spec, dt, rate, pace);
+        continue;
+      }
 
       if (enemy.kind === 'lurker') {
         // Charges straight in, and leans into the turn, so it can be dodged but not outrun.
@@ -392,7 +499,7 @@ export function createWorld(random) {
     for (let index = state.enemies.length - 1; index >= 0; index -= 1) {
       const enemy = state.enemies[index];
       if (Math.hypot(enemy.x - state.warden.x, enemy.y - state.warden.y) > state.mods.flareRadius) continue;
-      enemy.hp -= FLARE.damage;
+      enemy.hp -= state.mods.flareDamage;
       enemy.hurt = 0.2;
       if (enemy.hp <= 0) {
         killEnemy(enemy, index);
@@ -439,7 +546,7 @@ export function createWorld(random) {
     // The ward turns toward the pointer at a limited rate: aiming is a skill.
     const want = Math.atan2(input.aimY - state.warden.y, input.aimX - state.warden.x);
     const delta = angleTo(state.ward.angle, want);
-    const turn = WARD.turnRate * dt;
+    const turn = WARD.turnRate * state.mods.turnMul * dt;
     state.ward.angle += clamp(delta, -turn, turn);
 
     if (state.phase === PHASE_WAVE) {
@@ -464,7 +571,14 @@ export function createWorld(random) {
 
       if (state.spawnQueue.length === 0 && state.enemies.length === 0 && state.phase === PHASE_WAVE) {
         state.score += SCORE.perWave * state.wave;
-        state.offer = offerUpgrades(state, random);
+        if (state.pendingRelic) {
+          state.offer = offerRelics(state, random);
+          state.offerKind = 'relic';
+          state.pendingRelic = false;
+        } else {
+          state.offer = offerUpgrades(state, random);
+          state.offerKind = 'upgrade';
+        }
         state.phase = PHASE_UPGRADE;
         particles.ring(FIELD.width / 2, FIELD.height / 2, '#8ef0ff');
         events |= EV_WAVE_CLEAR;

@@ -148,6 +148,10 @@ export function stageShot(name, world) {
     mods: { ...state.mods },
     kills: state.kills,
     charge: state.charge,
+    zone: state.zone,
+    zoneName: state.zoneName,
+    offerKind: state.offerKind,
+    pendingRelic: state.pendingRelic,
   });
 
   const restore = (frame) => {
@@ -163,6 +167,10 @@ export function stageShot(name, world) {
     state.mods = { ...frame.mods };
     state.kills = frame.kills;
     state.charge = frame.charge;
+    state.zone = frame.zone;
+    state.zoneName = frame.zoneName;
+    state.offerKind = frame.offerKind;
+    state.pendingRelic = frame.pendingRelic;
   };
 
   if (name === 'play') {
@@ -187,6 +195,42 @@ export function stageShot(name, world) {
     state.charge = 74;
     state.chain = 3;
     state.chainTimer = 1.2;
+    state.flash = 0;
+    state.shake = 0;
+    return { screen: 'play', hover: 0 };
+  }
+
+  if (name === 'boss') {
+    world.reset();
+    // A boss sits at wave five, past where a four-heart run usually ends, so this scene hands the warden
+    // the loadout a player would plausibly hold by then: two Step cards, two Wider Ward cards, a Hot
+    // Mirror, a Steady Hand, a Lasting Light and the extra hearts two Steady Wicks buy. Every card is one
+    // the game really offers, and every frame after this is the real rules run by the real autopilot.
+    state.mods.maxHearts = 9;
+    state.hearts = 9;
+    state.mods.speed *= 1.12 * 1.12;
+    state.mods.wardHalf += 0.14 * 2;
+    state.mods.reflectDamage *= 1.35;
+    state.mods.turnMul *= 1.35;
+    state.mods.shardLife *= 1.25;
+
+    let frame = null;
+    let frameScore = -1;
+    for (let step = 0; step < 60000; step += 1) {
+      if (state.phase === 'upgrade') { world.chooseUpgrade(0); continue; }
+      if (state.phase === 'over') break;
+      world.step(STEP, autopilot(state));
+      const boss = state.enemies.find((enemy) => enemy.boss);
+      if (!boss) continue;
+      const foeShards = state.shards.filter((shard) => shard.owner === 'enemy').length;
+      const drained = 1 - Math.max(0, Math.min(1, boss.hp / boss.maxHp));
+      // A boss with its bar already eaten into, in a crowded sky, is the frame that shows the fight working.
+      const busy = foeShards + state.enemies.length * 2 + drained * 14;
+      if (busy > frameScore) { frameScore = busy; frame = snapshot(); }
+      if (foeShards >= 6 && drained >= 0.42) break;
+    }
+    if (frame) restore(frame);
+    state.phase = 'wave';
     state.flash = 0;
     state.shake = 0;
     return { screen: 'play', hover: 0 };

@@ -2,15 +2,29 @@
 // teach one enemy at a time, then every wave mixes what came before with a little more of it.
 export const WAVE_NAMES = [
   'first light', 'drift', 'the leaning', 'press', 'split', 'the long dark',
-  'narrow', 'siege', 'the deep', 'hollow', 'last wick',
+  'narrow', 'siege', 'the deep', 'hollow', 'last wick', 'no dawn',
+  'the count', 'salt and rust', 'what waited',
 ];
+
+/** The boss a wave carries, or null. The stride alternates the two names, so wave 5 and 10 differ. */
+export function bossFor(wave) {
+  if (wave % BOSS_EVERY !== 0) return null;
+  return (wave / BOSS_EVERY) % 2 === 1 ? 'hollowking' : 'leviathan';
+}
 
 /** Which enemy kinds are on the field from which wave on. */
 const UNLOCK = { drifter: 1, lurker: 4, weaver: 5, splitter: 6, sentinel: 8 };
 
-/** How many of each kind a wave fields, before they are shuffled into a spawn order. */
+const BOSS_EVERY = 5;
+
+/**
+ * How many of each kind a wave fields, before they are shuffled into a spawn order. A boss wave sends
+ * a smaller escort: the boss is the wave, and a crowd on top of it would only hide it.
+ */
 export function waveComposition(wave) {
-  const budget = 1 + Math.round(wave * 0.75);
+  const boss = bossFor(wave) !== null;
+  const raw = 1 + Math.round(wave * 0.75);
+  const budget = boss ? Math.max(2, Math.round(raw * 0.5)) : raw;
   const counts = { drifter: 0, lurker: 0, weaver: 0, splitter: 0, sentinel: 0 };
 
   const weights = [];

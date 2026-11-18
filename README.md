@@ -20,14 +20,25 @@ you throw is your own — every kill was aimed at you first.
   that clears the shards around you and hurts everything close.
 - **Stay alive.** Four hearts, one lost per shard or lunging husk that reaches you; a short
   invulnerability follows each hit. Kills in quick succession chain into a score multiplier.
-- **Choose a gift.** Clearing a wave offers three upgrades — a wider Ward, hotter reflections, a longer
-  flare, faster feet, a heart, a patch for the one you lost — one pick, then the next wave.
+- **Choose a gift.** Clearing a wave offers three of thirteen upgrades — a wider Ward, hotter
+  reflections, a longer flare, faster feet, a steadier turn, a heart, a patch for the one you lost —
+  one pick, then the next wave. Cards stack, and the upgrade pool runs dry only if you take everything.
+- **Break the thing that owns the dark.** Every fifth wave is a boss with three phases: an aimed spread,
+  then a full ring once it is down to two thirds, then a spiral that never lets the arena go quiet. It
+  holds the middle distance, strafes, and leans harder as it loses health. Killing one leaves a relic —
+  two cards, both stronger than any ordinary gift, one pick.
+- **Watch the zone.** Every three waves the light shifts: the Hollow is neutral, Ember Reach fires
+  faster, Saltmere Flats moves everything quicker, the Undertow brings things that take longer to break,
+  and the Last Wick does all three at once. Each zone is a mood and a multiplier, never a new rule, and
+  the HUD names the one you are standing in.
+- **Wave eleven is the end of the road, not the end of the run.** Past it the zone cycle keeps turning
+  and the bosses keep coming, one every five waves, with the score multiplier climbing the whole way.
 - `Esc` or `P` pauses, `M` mutes, `Space` starts and restarts.
 
 | | |
 |---|---|
-| ![mid-wave](screenshots/2-play.jpg) | ![upgrade choice](screenshots/3-upgrade.jpg) |
-| **Wave 4.** Shards in the air, charge nearly banked, a chain already running. | **The gift.** Three cards between waves, one pick each time. |
+| ![boss fight](screenshots/2-boss.jpg) | ![upgrade choice](screenshots/3-upgrade.jpg) |
+| **Wave 5, Ember Reach.** The Hollow King at two thirds, its ring already out, the sky full of its shards. | **The gift.** Three cards between waves, one pick each time. |
 
 ![game over](screenshots/4-over.jpg)
 
@@ -35,7 +46,9 @@ Fold in wave 5 or 6 and the field turns hostile in layers: drifters that lob sin
 weavers that keep their distance and fire fans, lurkers that charge and cannot be deflected at all,
 splitters that breed when they die, and sentinels that shoot in pairs. Every wave that drags on gets
 louder — enemies close and fire faster the longer you take to clear them, so kiting a last straggler
-around the arena is not a strategy.
+around the arena is not a strategy. The screenshots above are frames the game played to reach, not
+poses: the boss still is a wave-five run handed the loadout a player holds by then, then played by the
+same autopilot the balance tests use.
 
 ## Run it
 
