@@ -1,13 +1,13 @@
 [
   {
-    "name": "1-title.jpg",
-    "url": "index.html?shot=start&seed=20261118",
+    "name": "1-boss.jpg",
+    "url": "index.html?shot=boss&seed=20261118",
     "width": 1280,
     "height": 720
   },
   {
-    "name": "2-boss.jpg",
-    "url": "index.html?shot=boss&seed=20261118",
+    "name": "2-title.jpg",
+    "url": "index.html?shot=start&seed=20261118",
     "width": 1280,
     "height": 720
   },

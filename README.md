@@ -37,7 +37,7 @@ you throw is your own — every kill was aimed at you first.
 
 | | |
 |---|---|
-| ![boss fight](screenshots/2-boss.jpg) | ![upgrade choice](screenshots/3-upgrade.jpg) |
+| ![boss fight](screenshots/1-boss.jpg) | ![upgrade choice](screenshots/3-upgrade.jpg) |
 | **Wave 5, Ember Reach.** The Hollow King at two thirds, its ring already out, the sky full of its shards. | **The gift.** Three cards between waves, one pick each time. |
 
 ![game over](screenshots/4-over.jpg)
