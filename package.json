@@ -1,0 +1,11 @@
+{
+  "name": "hollowlight",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Hollowlight: hold the last light. A browser arcade game where you return what the dark throws at you.",
+  "scripts": {
+    "serve": "node serve.ts",
+    "dossier": "node main.ts"
+  }
+}

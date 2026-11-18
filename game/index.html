@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Hollowlight — hold the last light</title>
+<meta name="description" content="Hollowlight is a one-screen arcade game about catching what the dark throws at you and sending it back. Move with WASD, aim the ward with the mouse, flare when the charge fills.">
+<meta name="theme-color" content="#070a14">
+<meta property="og:title" content="Hollowlight">
+<meta property="og:description" content="Catch the shards. Send them back. Hold the last light.">
+<meta property="og:type" content="website">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' fill='%23070a14'/%3E%3Cpath d='M16 6c4 5 6 8 6 12a6 6 0 1 1-12 0c0-4 2-7 6-12z' fill='%23ffcf6b'/%3E%3Ccircle cx='16' cy='20' r='2' fill='%23fff3c4'/%3E%3C/svg%3E">
+<style>
+  :root { color-scheme: dark; }
+  html, body {
+    margin: 0;
+    height: 100%;
+    background: #070a14;
+    overflow: hidden;
+    font-family: ui-monospace, "Cascadia Mono", Consolas, monospace;
+    color: #e9f1ff;
+    -webkit-tap-highlight-color: transparent;
+  }
+  #field {
+    display: block;
+    width: 100vw;
+    height: 100vh;
+    cursor: crosshair;
+    touch-action: none;
+  }
+  /* Read by screen readers and by anyone whose browser refused the module. */
+  #about {
+    position: absolute;
+    width: 1px; height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+</style>
+</head>
+<body>
+<canvas id="field" aria-label="Hollowlight: an arcade game. Move with W A S D or the arrow keys, aim the ward with the mouse, and press Space to flare when the charge is full."></canvas>
+<p id="about">Hollowlight. You are the last wick in a hollow world. Shards come for you; catch them on the ward and they turn, and they are yours to spend. Clear a wave, choose a gift, go again. Press Space to begin.</p>
+<noscript>Hollowlight needs JavaScript to run. Everything it uses is in this folder: open index.html from a local server, not from the filesystem.</noscript>
+<script type="module" src="src/main.js"></script>
+</body>
+</html>
